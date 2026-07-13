@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Адаптивний тренажер усного множення і ділення з підказками, таймером і звуком.">
+  <title>Усний рахунок — математичний тренажер</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --background: #f5f7fb;
+      --foreground: #172033;
+      --card: #ffffff;
+      --card-foreground: #172033;
+      --muted: #dfe5ef;
+      --muted-foreground: #526079;
+      --accent: #e9f1ff;
+      --accent-foreground: #173b72;
+      --primary: #2457d6;
+      --primary-foreground: #ffffff;
+      --destructive: #b42318;
+      --border: #cdd5e2;
+      --input: #ffffff;
+      --ring: #2457d6;
+      --viz-series-1: #2457d6;
+      --viz-series-2: #16803d;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px 16px; background: var(--background); color: var(--foreground); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { width: min(820px, 100%); margin: 0 auto; }
+    h1 { margin: 0 0 6px; font-size: clamp(26px, 6vw, 40px); }
+    .subtitle { margin: 0 0 20px; color: var(--muted-foreground); }
+    .btn { min-height: 42px; padding: 9px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--card-foreground); font: inherit; font-weight: 600; cursor: pointer; }
+    .btn:hover:not(:disabled) { filter: brightness(.97); }
+    .btn:focus-visible, .form-control:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-primary { border-color: var(--primary); background: var(--primary); color: var(--primary-foreground); }
+    .form-label { display: grid; gap: 6px; font-weight: 600; }
+    .form-control { min-height: 48px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--input); color: var(--foreground); font: inherit; }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #101521;
+        --foreground: #edf2fb;
+        --card: #192233;
+        --card-foreground: #edf2fb;
+        --muted: #303b50;
+        --muted-foreground: #b6c0d2;
+        --accent: #1c355c;
+        --accent-foreground: #e5efff;
+        --primary: #7fa6ff;
+        --primary-foreground: #0b1c40;
+        --destructive: #ff8a80;
+        --border: #445067;
+        --input: #111827;
+        --ring: #9ab8ff;
+        --viz-series-1: #7fa6ff;
+        --viz-series-2: #68d391;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Усний рахунок</h1>
+  <p class="subtitle">Множення і ділення з короткими стратегіями та адаптивним таймером</p>
+<section id="mental-math-trainer" aria-label="Тренажер усного множення і ділення">
+  <style>
+    #mental-math-trainer { display: grid; gap: 16px; }
+    #mental-math-trainer .game-head { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; }
+    #mental-math-trainer .stats { display: flex; flex-wrap: wrap; gap: 8px; }
+    #mental-math-trainer .stat-chip { padding: 7px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--foreground); }
+    #mental-math-trainer .timer-track { height: 10px; overflow: hidden; border-radius: 999px; background: var(--muted); }
+    #mental-math-trainer .timer-fill { height: 100%; width: 100%; background: var(--viz-series-1); transform-origin: left; transition: width 80ms linear; }
+    #mental-math-trainer .play-area { display: grid; gap: 16px; text-align: center; padding: 22px; border: 1px solid var(--border); border-radius: 16px; background: var(--card); color: var(--card-foreground); }
+    #mental-math-trainer .problem { font-size: clamp(34px, 9vw, 64px); font-weight: 500; letter-spacing: .02em; }
+    #mental-math-trainer .answer-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: end; }
+    #mental-math-trainer .answer-field { width: min(230px, 100%); text-align: center; font-size: 22px; }
+    #mental-math-trainer .message { min-height: 26px; font-weight: 500; }
+    #mental-math-trainer .message.good { color: var(--viz-series-2); }
+    #mental-math-trainer .message.bad { color: var(--destructive); }
+    #mental-math-trainer .hint-box { text-align: left; padding: 14px; border-radius: 12px; background: var(--accent); color: var(--accent-foreground); }
+    #mental-math-trainer .hint-box[hidden] { display: none; }
+    #mental-math-trainer .hint-rule { margin-bottom: 6px; font-weight: 500; }
+    #mental-math-trainer .start-note { text-align: center; color: var(--muted-foreground); }
+    @media (max-width: 460px) {
+      #mental-math-trainer .game-head { align-items: stretch; }
+      #mental-math-trainer .stats { justify-content: center; }
+      #mental-math-trainer .answer-row > * { width: 100%; }
+      #mental-math-trainer .answer-field { width: 100%; }
+    }
+  </style>
+
+  <div class="game-head">
+    <div class="stats" aria-live="polite">
+      <span class="stat-chip">Рівень: <strong id="mm-level">1</strong></span>
+      <span class="stat-chip">Бали: <strong id="mm-score">0</strong></span>
+      <span class="stat-chip">Серія: <strong id="mm-streak">0</strong></span>
+      <span class="stat-chip">Час: <strong id="mm-time">12,0</strong> с</span>
+    </div>
+    <div class="stats">
+      <button class="btn" id="mm-sound" type="button" aria-pressed="true">🔊 Звук увімкнено</button>
+      <button class="btn btn-primary" id="mm-start" type="button">Почати гру</button>
+    </div>
+  </div>
+
+  <div class="timer-track" role="progressbar" aria-label="Час на відповідь" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+    <div class="timer-fill" id="mm-timer-fill"></div>
+  </div>
+
+  <div class="play-area">
+    <div class="problem" id="mm-problem">5 · 25 = ?</div>
+    <div class="answer-row">
+      <label class="form-label answer-field" for="mm-answer">
+        Відповідь
+        <input class="form-control answer-field" id="mm-answer" inputmode="decimal" autocomplete="off" disabled>
+      </label>
+      <button class="btn btn-primary" id="mm-check" type="button" disabled>Перевірити</button>
+      <button class="btn" id="mm-hint" type="button" disabled>Підказка</button>
+    </div>
+    <div class="message" id="mm-message" aria-live="assertive">Натисніть «Почати гру».</div>
+    <div class="hint-box" id="mm-hint-box" hidden>
+      <div class="hint-rule" id="mm-hint-rule"></div>
+      <div id="mm-hint-work"></div>
+    </div>
+  </div>
+  <div class="start-note">Після кожних 5 правильних відповідей рівень зростає, а часу стає менше.</div>
+
+  <script>
+    (function () {
+      const root = document.getElementById("mental-math-trainer");
+      const els = {
+        level: root.querySelector("#mm-level"),
+        score: root.querySelector("#mm-score"),
+        streak: root.querySelector("#mm-streak"),
+        time: root.querySelector("#mm-time"),
+        start: root.querySelector("#mm-start"),
+        sound: root.querySelector("#mm-sound"),
+        fill: root.querySelector("#mm-timer-fill"),
+        track: root.querySelector(".timer-track"),
+        problem: root.querySelector("#mm-problem"),
+        answer: root.querySelector("#mm-answer"),
+        check: root.querySelector("#mm-check"),
+        hint: root.querySelector("#mm-hint"),
+        message: root.querySelector("#mm-message"),
+        hintBox: root.querySelector("#mm-hint-box"),
+        hintRule: root.querySelector("#mm-hint-rule"),
+        hintWork: root.querySelector("#mm-hint-work")
+      };
+
+      let running = false;
+      let score = 0;
+      let streak = 0;
+      let correctTotal = 0;
+      let level = 1;
+      let current = null;
+      let timerId = null;
+      let deadline = 0;
+      let duration = 12000;
+      let locked = false;
+      let lastKind = "";
+      let soundOn = true;
+      let audioContext = null;
+      let lastBeepSecond = null;
+      let roundToken = 0;
+
+      function getAudioContext() {
+        if (!audioContext) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) audioContext = new AudioContextClass();
+        }
+        if (audioContext && audioContext.state === "suspended") audioContext.resume();
+        return audioContext;
+      }
+
+      function tone(frequency, length, delay, volume, wave) {
+        if (!soundOn) return;
+        const context = getAudioContext();
+        if (!context) return;
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const start = context.currentTime + (delay || 0);
+        oscillator.type = wave || "sine";
+        oscillator.frequency.setValueAtTime(frequency, start);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(volume || 0.08, start + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start(start);
+        oscillator.stop(start + length + 0.03);
+      }
+
+      function soundCorrect() {
+        tone(523.25, 0.15, 0, 0.07, "sine");
+        tone(659.25, 0.2, 0.12, 0.07, "sine");
+      }
+
+      function soundLevelUp() {
+        tone(523.25, 0.13, 0, 0.07, "triangle");
+        tone(659.25, 0.13, 0.11, 0.07, "triangle");
+        tone(783.99, 0.28, 0.22, 0.08, "triangle");
+      }
+
+      function soundWrong() {
+        tone(220, 0.18, 0, 0.08, "sawtooth");
+        tone(174.61, 0.26, 0.15, 0.07, "sawtooth");
+      }
+
+      function soundTick() {
+        tone(880, 0.055, 0, 0.045, "square");
+      }
+
+      const pick = function (arr) { return arr[Math.floor(Math.random() * arr.length)]; };
+      const nice = function (n) { return String(n).replace(".", ","); };
+      const normalize = function (value) { return Number(value.trim().replace(",", ".")); };
+
+      function makeProblem() {
+        const kinds = level < 2
+          ? ["x5", "x20", "x15", "x25", "x02"]
+          : ["x5", "x20", "x15", "x25", "x02", "x05", "x025", "d5", "d15", "d25", "d02", "d05", "d025"];
+        let kind = pick(kinds);
+        if (kind === lastKind && kinds.length > 1) kind = pick(kinds.filter(function (k) { return k !== lastKind; }));
+        lastKind = kind;
+
+        let a;
+        let b;
+        let answer;
+        let text;
+        let rule;
+        let work;
+
+        if (kind === "x5") {
+          a = pick([6, 8, 12, 14, 16, 18, 24, 26, 32, 36]);
+          answer = a * 5; text = a + " · 5";
+          rule = "Помножити на 5 — це помножити на 10 і поділити навпіл.";
+          work = a + " · 10 : 2 = " + (a * 10) + " : 2 = " + answer;
+        } else if (kind === "x20") {
+          a = pick([3, 4, 6, 7, 8, 12, 14, 16, 18, 24]);
+          answer = a * 20; text = a + " · 20";
+          rule = "Помножити на 20 — це помножити на 2, а потім на 10.";
+          work = a + " · 2 · 10 = " + (a * 2) + " · 10 = " + answer;
+        } else if (kind === "x15") {
+          a = pick([4, 6, 8, 12, 14, 16, 18, 22, 24, 26]);
+          answer = a * 15; text = a + " · 15";
+          rule = "Помножити на 15 — це помножити на 10 і додати половину отриманого.";
+          work = (a * 10) + " + " + (a * 5) + " = " + answer;
+        } else if (kind === "x25") {
+          a = pick([4, 5, 6, 8, 12, 14, 16, 18, 24, 28]);
+          answer = a * 25; text = a + " · 25";
+          rule = "Помножити на 25 — це помножити на 100 і поділити на 4.";
+          work = a + " · 100 : 4 = " + (a * 100) + " : 4 = " + answer;
+        } else if (kind === "x02") {
+          a = pick([10, 15, 20, 25, 30, 35, 40, 45, 50, 60]);
+          answer = a / 5; text = "0,2 · " + a;
+          rule = "0,2 — це одна п’ята, тому число треба поділити на 5.";
+          work = a + " : 5 = " + answer;
+        } else if (kind === "x05") {
+          a = pick([12, 14, 16, 18, 22, 24, 26, 30, 36, 48]);
+          answer = a / 2; text = "0,5 · " + a;
+          rule = "0,5 — це половина, тому число треба поділити на 2.";
+          work = a + " : 2 = " + answer;
+        } else if (kind === "x025") {
+          a = pick([12, 16, 20, 24, 28, 32, 36, 40, 48, 60]);
+          answer = a / 4; text = "0,25 · " + a;
+          rule = "0,25 — це чверть, тому число треба поділити на 4.";
+          work = a + " : 4 = " + answer;
+        } else if (kind === "d5") {
+          b = pick([6, 8, 12, 14, 16, 18, 24, 26]); a = b * 5;
+          answer = b; text = a + " : 5";
+          rule = "Поділити на 5 — це поділити на 10 і помножити на 2.";
+          work = a + " : 10 · 2 = " + nice(a / 10) + " · 2 = " + answer;
+        } else if (kind === "d15") {
+          b = pick([4, 6, 8, 12, 14, 16, 18, 22]); a = b * 15;
+          answer = b; text = a + " : 15";
+          rule = "Шукаємо число, яке при множенні на 15 дає " + a + ".";
+          work = "15 · " + b + " = " + a + ", тому " + a + " : 15 = " + b;
+        } else if (kind === "d25") {
+          b = pick([4, 5, 6, 8, 12, 14, 16, 18]); a = b * 25;
+          answer = b; text = a + " : 25";
+          rule = "25 міститься в кожній сотні 4 рази. Можна помножити на 4 і поділити на 100.";
+          work = a + " · 4 : 100 = " + (a * 4) + " : 100 = " + b;
+        } else if (kind === "d02") {
+          a = pick([4, 6, 8, 12, 14, 16, 18, 20]); answer = a * 5; text = a + " : 0,2";
+          rule = "Поділити на 0,2 — це визначити, скільки п’ятих міститься в числі, тобто помножити на 5.";
+          work = a + " · 5 = " + answer;
+        } else if (kind === "d05") {
+          a = pick([6, 8, 12, 14, 16, 18, 24, 30]); answer = a * 2; text = a + " : 0,5";
+          rule = "Поділити на 0,5 — це визначити, скільки половин міститься в числі, тобто помножити на 2.";
+          work = a + " · 2 = " + answer;
+        } else {
+          a = pick([4, 6, 8, 10, 12, 14, 16, 20]); answer = a * 4; text = a + " : 0,25";
+          rule = "Поділити на 0,25 — це визначити, скільки чвертей міститься в числі, тобто помножити на 4.";
+          work = a + " · 4 = " + answer;
+        }
+        return { text: text, answer: answer, rule: rule, work: work };
+      }
+
+      function updateStats() {
+        els.level.textContent = level;
+        els.score.textContent = score;
+        els.streak.textContent = streak;
+      }
+
+      function setMessage(text, type) {
+        els.message.textContent = text;
+        els.message.className = "message" + (type ? " " + type : "");
+      }
+
+      function showHint(reason) {
+        els.hintRule.textContent = (reason ? reason + " " : "") + current.rule;
+        els.hintWork.textContent = current.work;
+        els.hintBox.hidden = false;
+      }
+
+      function stopTimer() {
+        if (timerId) cancelAnimationFrame(timerId);
+        timerId = null;
+      }
+
+      function tick() {
+        if (!running || locked) return;
+        const remaining = Math.max(0, deadline - performance.now());
+        const percent = remaining / duration * 100;
+        els.fill.style.width = percent + "%";
+        els.track.setAttribute("aria-valuenow", String(Math.round(percent)));
+        els.time.textContent = (remaining / 1000).toFixed(1).replace(".", ",");
+        const beepSecond = Math.ceil(remaining / 1000);
+        if (beepSecond <= 3 && beepSecond > 0 && beepSecond !== lastBeepSecond) {
+          lastBeepSecond = beepSecond;
+          soundTick();
+        }
+        if (remaining <= 0) {
+          handleMiss("Час вийшов.");
+          return;
+        }
+        timerId = requestAnimationFrame(tick);
+      }
+
+      function beginTimer() {
+        stopTimer();
+        duration = Math.max(4000, 12000 - (level - 1) * 850);
+        deadline = performance.now() + duration;
+        lastBeepSecond = null;
+        els.fill.style.width = "100%";
+        els.track.setAttribute("aria-valuenow", "100");
+        els.time.textContent = (duration / 1000).toFixed(1).replace(".", ",");
+        timerId = requestAnimationFrame(tick);
+      }
+
+      function nextProblem() {
+        roundToken += 1;
+        locked = false;
+        current = makeProblem();
+        els.problem.textContent = current.text + " = ?";
+        els.answer.value = "";
+        els.hintBox.hidden = true;
+        setMessage("Обчисліть зручним способом.", "");
+        els.answer.disabled = false;
+        els.check.disabled = false;
+        els.hint.disabled = false;
+        els.answer.focus();
+        beginTimer();
+      }
+
+      function handleMiss(prefix) {
+        if (locked) return;
+        locked = true;
+        stopTimer();
+        streak = 0;
+        score = Math.max(0, score - 2);
+        updateStats();
+        soundWrong();
+        setMessage(prefix + " Правильна відповідь: " + nice(current.answer) + ".", "bad");
+        showHint("Подивіться на швидкий спосіб.");
+        els.answer.disabled = true;
+        els.check.disabled = true;
+        els.hint.disabled = true;
+        const token = roundToken;
+        window.setTimeout(function () {
+          if (running && token === roundToken) nextProblem();
+        }, 4200);
+      }
+
+      function checkAnswer() {
+        if (!running || locked) return;
+        const value = normalize(els.answer.value);
+        if (!Number.isFinite(value)) {
+          setMessage("Введіть число.", "bad");
+          els.answer.focus();
+          return;
+        }
+        if (Math.abs(value - current.answer) < 0.000001) {
+          locked = true;
+          stopTimer();
+          correctTotal += 1;
+          streak += 1;
+          score += 10 + Math.min(streak, 10);
+          const oldLevel = level;
+          level = Math.min(10, 1 + Math.floor(correctTotal / 5));
+          updateStats();
+          if (level > oldLevel) soundLevelUp(); else soundCorrect();
+          setMessage(level > oldLevel ? "Правильно! Новий рівень — часу менше." : "Правильно!", "good");
+          els.answer.disabled = true;
+          els.check.disabled = true;
+          els.hint.disabled = true;
+          const token = roundToken;
+          window.setTimeout(function () {
+            if (running && token === roundToken) nextProblem();
+          }, 800);
+        } else {
+          handleMiss("Поки що ні.");
+        }
+      }
+
+      function startGame() {
+        stopTimer();
+        roundToken += 1;
+        getAudioContext();
+        running = true;
+        score = 0;
+        streak = 0;
+        correctTotal = 0;
+        level = 1;
+        lastKind = "";
+        updateStats();
+        els.start.textContent = "Почати спочатку";
+        nextProblem();
+      }
+
+      els.start.addEventListener("click", startGame);
+      els.sound.addEventListener("click", function () {
+        soundOn = !soundOn;
+        els.sound.setAttribute("aria-pressed", String(soundOn));
+        els.sound.textContent = soundOn ? "🔊 Звук увімкнено" : "🔇 Звук вимкнено";
+        if (soundOn) {
+          getAudioContext();
+          tone(659.25, 0.12, 0, 0.06, "sine");
+        }
+      });
+      els.check.addEventListener("click", checkAnswer);
+      els.answer.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") checkAnswer();
+      });
+      els.hint.addEventListener("click", function () {
+        if (!running || locked) return;
+        score = Math.max(0, score - 1);
+        updateStats();
+        showHint("");
+        setMessage("Скористайтеся підказкою і введіть відповідь.", "");
+        els.answer.focus();
+      });
+    }());
+  </script>
+</section>
+</main>
+</body>
+</html>
